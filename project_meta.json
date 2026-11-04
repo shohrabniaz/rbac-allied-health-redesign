@@ -1,10 +1,17 @@
 {
-  "seq": 45,
   "title": "Role-Based Access Control Redesign for a Multi-Site Allied Health Practice",
-  "slug": "role-based-access-control-redesign-for-a-multi-site-all",
+  "old_slug": "role-based-access-control-redesign-for-a-multi-site-all",
+  "slug": "rbac-allied-health-redesign",
   "folder": "Role_Based_Access_Control_Redesign_For_A",
   "kind": "general",
-  "body_words": 255,
+  "body_words": 320,
+  "source": "SCI700",
   "project_id": "Project 2",
-  "source": "SCI700"
+  "public": {
+    "public_ok": true,
+    "tier": "public-ok",
+    "reasons": [
+      "Showcase-ready design pack with labelled synthetic baseline"
+    ]
+  }
 }
