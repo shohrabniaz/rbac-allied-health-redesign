@@ -1,71 +1,44 @@
 from __future__ import annotations
 import json
-from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from uuid import uuid4
+import yaml
 
-@dataclass
-class Record:
-    id: str
-    title: str
-    status: str = "open"
-    meta: dict = field(default_factory=dict)
+def load_playbook(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-class Store:
-    def __init__(self, path: Path):
-        self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            self._write([])
-
-    def _read(self) -> list[dict]:
-        return json.loads(self.path.read_text(encoding="utf-8"))
-
-    def _write(self, rows: list[dict]) -> None:
-        self.path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
-
-    def list(self) -> list[dict]:
-        return self._read()
-
-    def add(self, title: str, status: str = "open", **meta) -> dict:
-        rows = self._read()
-        rec = asdict(Record(id=str(uuid4())[:8], title=title, status=status, meta=meta))
-        rows.append(rec)
-        self._write(rows)
-        return rec
-
-    def set_status(self, rec_id: str, status: str) -> dict | None:
-        rows = self._read()
-        for r in rows:
-            if r["id"] == rec_id:
-                r["status"] = status
-                self._write(rows)
-                return r
-        return None
-
-    def summary(self) -> dict:
-        rows = self._read()
-        by: dict[str, int] = {}
-        for r in rows:
-            by[r["status"]] = by.get(r["status"], 0) + 1
-        return {"total": len(rows), "by_status": by, "records": rows}
-
-def seed(store: Store, seed_path: Path) -> None:
-    if store.list():
-        return
-    seeds = json.loads(seed_path.read_text(encoding="utf-8"))
-    for s in seeds:
-        store.add(s["title"], s.get("status", "open"), **s.get("meta", {}))
+def execute_steps(playbook: dict, answers: dict | None = None) -> dict:
+    answers = answers or {}
+    results = []
+    completed = 0
+    for step in playbook.get("steps", []):
+        sid = step["id"]
+        required = bool(step.get("required", True))
+        done = bool(answers.get(sid, step.get("default_done", False)))
+        if done:
+            completed += 1
+        results.append({
+            "id": sid,
+            "title": step.get("title"),
+            "owner": step.get("owner"),
+            "required": required,
+            "done": done,
+            "sla_hours": step.get("sla_hours"),
+        })
+    total = len(results) or 1
+    return {
+        "playbook": playbook.get("name"),
+        "completion_percent": round(100.0 * completed / total, 1),
+        "completed": completed,
+        "total": total,
+        "open_required": [r["id"] for r in results if r["required"] and not r["done"]],
+        "steps": results,
+    }
 
 def run(data_dir: Path, out_dir: Path) -> dict:
-    store = Store(out_dir / "records.json")
-    seed(store, data_dir / "seed_records.json")
-    rows = store.list()
-    if rows:
-        store.set_status(rows[0]["id"], "in_progress")
-        if len(rows) > 1:
-            store.set_status(rows[1]["id"], "done")
-    summary = store.summary()
+    playbook = load_playbook(data_dir / "playbook.yaml")
+    answers_path = data_dir / "step_status.json"
+    answers = json.loads(answers_path.read_text(encoding="utf-8")) if answers_path.exists() else {}
+    summary = execute_steps(playbook, answers)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "service_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (out_dir / "playbook_run.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary

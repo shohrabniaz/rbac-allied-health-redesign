@@ -58,7 +58,7 @@ python -m src.cli run
 python tests\test_smoke.py
 ```
 
-Domain engine kind: `general`.
+Domain engine kind: `identity`.
 
 **Author:** Md Shohrab Hossen Niaz  
 **GitHub:** `rbac-allied-health-redesign`
